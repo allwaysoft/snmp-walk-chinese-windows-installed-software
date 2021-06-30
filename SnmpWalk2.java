@@ -1,11 +1,12 @@
-
+ 
 import java.io.IOException;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-
+import java.util.regex.Pattern;
+ 
 import org.snmp4j.CommunityTarget;
 import org.snmp4j.Snmp;
 import org.snmp4j.Target;
@@ -20,51 +21,51 @@ import org.snmp4j.transport.DefaultUdpTransportMapping;
 import org.snmp4j.util.DefaultPDUFactory;
 import org.snmp4j.util.TreeEvent;
 import org.snmp4j.util.TreeUtils;
-
+ 
 public class SnmpWalk2 {
 	// octetString 转 二进制
-
+ 
 	private static int[] octetStringToBytes(String value_ipar) {
 		// ---------------------------
 		// Split string into its parts
 		// ---------------------------
 		String[] bytes;
 		bytes = value_ipar.split("[^0-9A-Fa-f]");
-
+ 
 		// -----------------
 		// Initialize result
 		// -----------------
 		int[] result;
 		result = new int[bytes.length];
-
+ 
 		// -------------
 		// Convert bytes
 		// -------------
 		int counter;
 		for (counter = 0; counter < bytes.length; counter++)
 			result[counter] = Integer.parseInt(bytes[counter], 16);
-
+ 
 		// ----
 		// Done
 		// ----
 		return (result);
-
+ 
 	}
 	// octetString 转 Date
-
+ 
 	private static Date octetStringToDate(String value_ipar) throws Exception {
 		// ---------------------------
 		// Convert into array of bytes
 		// ---------------------------
 		int[] bytes;
 		bytes = octetStringToBytes(value_ipar);
-
+ 
 		// -----------------------
 		// Maybe nothing specified
 		// -----------------------
 		if (bytes[0] == 0)
 			return (null);
-
+ 
 		// ------------------
 		// Extract parameters
 		// ------------------
@@ -92,7 +93,7 @@ public class SnmpWalk2 {
 				offset = -offset;
 			offset *= 60 * 1000;
 		}
-
+ 
 		// ------------------------------------
 		// Get current DST and time zone offset
 		// ------------------------------------
@@ -102,7 +103,7 @@ public class SnmpWalk2 {
 		calendar = Calendar.getInstance();
 		my_dst = calendar.get(Calendar.DST_OFFSET);
 		my_zone = calendar.get(Calendar.ZONE_OFFSET);
-
+ 
 		// ----------------------------------
 		// Compose result
 		// Month to be converted into 0-based
@@ -115,12 +116,12 @@ public class SnmpWalk2 {
 		calendar.set(Calendar.MINUTE, minute);
 		calendar.set(Calendar.SECOND, second);
 		calendar.set(Calendar.MILLISECOND, deci_sec * 100);
-
+ 
 		// ---------
 		// Reset DST
 		// ---------
 		calendar.add(Calendar.MILLISECOND, my_dst);
-
+ 
 		// -----------------------------------------------------------------------------------
 		// If the offset is set, we have to convert the time using the offset of
 		// our time zone
@@ -130,39 +131,55 @@ public class SnmpWalk2 {
 			delta = my_zone - offset;
 			calendar.add(Calendar.MILLISECOND, delta);
 		}
-
+ 
 		// -------------
 		// Return result
 		// -------------
 		return (calendar.getTime());
-
+ 
 	}
-
+ 
 	// octetString 转 中文
-
+	private static boolean isHex(String value) {
+		if (value == null || value.length() == 0) {
+			return false;
+		}
+		String splitStr = ":";
+		if (value.indexOf(splitStr) >= 0) {
+			value += splitStr;
+			String rex = "([0-9a-fA-F][0-9a-fA-F][" + splitStr + "])+";
+			Pattern p = Pattern.compile(rex);
+			if (p.matcher(value).matches()) {
+				return true;
+			}
+		}
+ 
+		return false;
+	}
+ 
 	private static String getChinese(String variable) {
 		String result = variable;
-
-		if (!variable.contains(":")) {
+ 
+		if (!isHex(variable)) {
 			return result;
 		}
-
+ 
 		if (result.equals(variable)) {
 			try {
-
+ 
 				String[] temps = variable.split(":");
 				byte[] bs = new byte[temps.length];
 				for (int i = 0; i < temps.length; i++)
 					bs[i] = (byte) Integer.parseInt(temps[i], 16);
 				result = new String(bs, "gbk");
 			} catch (Exception ex) {
-
+ 
 			}
 		}
 		return result;
-
+ 
 	}
-
+ 
 	public static void main(String[] args) throws Exception {
 		CommunityTarget target = new CommunityTarget();
 		target.setCommunity(new OctetString("public"));
@@ -170,11 +187,11 @@ public class SnmpWalk2 {
 		target.setRetries(2);
 		target.setTimeout(1500);
 		target.setVersion(SnmpConstants.version2c);
-
+ 
 		Map<String, String> result = doWalk(".1.3.6.1.2.1.25.6.3.1", target); // ifTable, mib-2 interfaces
-
+ 
 		for (Map.Entry<String, String> entry : result.entrySet()) {
-
+ 
 			if (entry.getKey().startsWith(".1.3.6.1.2.1.25.6.3.1.2")) {
 				System.out.println("name" + entry.getKey().replace(".1.3.6.1.2.1.25.6.3.1.2", "") + ": "
 						+ getChinese(entry.getValue()));
@@ -189,20 +206,20 @@ public class SnmpWalk2 {
 			}
 		}
 	}
-
+ 
 	public static Map<String, String> doWalk(String tableOid, Target target) throws IOException {
 		Map<String, String> result = new TreeMap<>();
 		TransportMapping<? extends Address> transport = new DefaultUdpTransportMapping();
 		Snmp snmp = new Snmp(transport);
 		transport.listen();
-
+ 
 		TreeUtils treeUtils = new TreeUtils(snmp, new DefaultPDUFactory());
 		List<TreeEvent> events = treeUtils.getSubtree(target, new OID(tableOid));
 		if (events == null || events.size() == 0) {
 			System.out.println("Error: Unable to read table...");
 			return result;
 		}
-
+ 
 		for (TreeEvent event : events) {
 			if (event == null) {
 				continue;
@@ -211,7 +228,7 @@ public class SnmpWalk2 {
 				System.out.println("Error: table OID [" + tableOid + "] " + event.getErrorMessage());
 				continue;
 			}
-
+ 
 			VariableBinding[] varBindings = event.getVariableBindings();
 			if (varBindings == null || varBindings.length == 0) {
 				continue;
@@ -220,14 +237,14 @@ public class SnmpWalk2 {
 				if (varBinding == null) {
 					continue;
 				}
-
+ 
 				result.put("." + varBinding.getOid().toString(), varBinding.getVariable().toString());
 			}
-
+ 
 		}
 		snmp.close();
-
+ 
 		return result;
 	}
-
+ 
 }
