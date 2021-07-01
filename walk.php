@@ -1,19 +1,16 @@
 <?php
- 
+
 $soft = array();
 $result = snmpwalk('127.0.0.1', 'public', '.1.3.6.1.2.1.25.6.3.1', 1000000, 3);
 $soft = array_chunk($result, count($result) / 5);
 if ($soft != FALSE) {
     if (count($soft) > 0) {
         $data_fetched = 'yes';
- 
-        $installed_type = array();
+
         $installed_name = array();
+        $installed_type = array();
         $installed_date = array();
-        for ($i = 0; $i < count($soft[2]); $i++) {
-            $installed_type[$i] = str_replace('INTEGER: ', '', $soft[2][$i]);
-        }
- 
+
         for ($i = 0; $i < count($soft[1]); $i++) {
             $split = explode(':', $soft[1][$i], 2);
             if (strcmp($split[0], 'Hex-STRING') == 0) {
@@ -57,12 +54,16 @@ if ($soft != FALSE) {
             }
         }
         for ($i = 0; $i < count($soft[3]); $i++) {
-            $data = str_replace('STRING: ', '', $soft[3][$i]);
+            $installed_type[$i] = str_replace('INTEGER: ', '', $soft[3][$i]);
+        }
+        for ($i = 0; $i < count($soft[4]); $i++) {
+            $data = str_replace('STRING: ', '', $soft[4][$i]);
             $installed_date[$i] = $data;
         }
-        print_r( $installed_type);
-        print_r( $installed_name);
-        print_r( $installed_date);
+
+        print_r($installed_name);
+        print_r($installed_type);
+        print_r($installed_date);
     } else {
         $data_fetched = 'no';
     }
