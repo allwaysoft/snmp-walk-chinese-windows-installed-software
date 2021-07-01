@@ -1,0 +1,13 @@
+{
+    "name": "vendor/php-project5",
+    "description": "Description of project PhpProject5.",
+    "authors": [
+        {
+            "name": "Administrator",
+            "email": "your@email.here"
+        }
+    ],
+    "require": {
+    "freedsx/snmp": "*"
+}
+}
